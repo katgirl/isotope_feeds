@@ -46,7 +46,7 @@ class IsotopeFeeds extends Controller
 	{
 		$objConfig = $this->Database->prepare("SELECT * FROM tl_iso_config WHERE id=? AND addFeed=?")
 									 ->limit(1)
-									 ->execute($intId, 1);
+									 ->execute($intId, 1);							 
 
 		if ($objConfig->numRows < 1)
 		{
@@ -224,7 +224,8 @@ class IsotopeFeeds extends Controller
 			$objProduct = new $strClass($objProductData->row());
 
 			if($objProduct->available)
-			{
+			{			
+				
 				$objItem = new FeedItem();
 
 				$strUrlKey = $objProduct->alias ? $objProduct->alias  : ($objProduct->pid ? $objProduct->pid : $objProduct->id);
@@ -240,7 +241,7 @@ class IsotopeFeeds extends Controller
 
 				//Sku, price, etc
 				$objItem->sku = strlen($objProduct->sku) ? $objProduct->sku : $objProduct->alias;
-				$objItem->price = $this->Isotope->formatPrice($objProduct->original_price) .' '. $arrConfig['currency'];
+				$objItem->price = $this->getPrice($objProduct->id, $arrConfig['id']) .' '. $arrConfig['currency'];
 
 				//Google specific settings
 				$objItem->condition = $objProduct->gid_condition;
@@ -350,6 +351,28 @@ class IsotopeFeeds extends Controller
 		}
 
 		return $arrReturn;
+	}
+
+	/**
+	 * Return an array of the product's original and/or watermarked images
+	 * @param array
+	 * @return array
+	 */
+	protected function getPrice($ProductID, $configID)
+	{
+		$objProduct = $this->Database->execute("SELECT MIN(p3.price) AS low_price
+														FROM tl_iso_prices p1
+														LEFT JOIN tl_iso_products p2 ON p1.pid=p2.id
+														LEFT JOIN tl_iso_price_tiers p3	ON p3.pid=p1.id
+														WHERE p2.pid = ". $ProductID ."
+														AND p1.config_id IN (" . $configID . ",0)
+														AND p1.member_group = 0
+														AND (p1.start='' OR p1.start<$time)
+														AND (p1.stop='' OR p1.stop>$time)		
+										           ");		
+		
+		
+		return $this->Isotope->formatPrice($objProduct->low_price ? $objProduct->low_price : '0.00');
 	}
 
 }
